@@ -1,0 +1,18 @@
+[Unit]
+Description=ATG Modbus RTU Slave (config regs + level/temp 6 tangki dari atg_data)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/atg_modbus_slave -c /dev/ttyUSB0
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+TimeoutStopSec=20s
+SendSIGKILL=yes
+
+[Install]
+WantedBy=multi-user.target
