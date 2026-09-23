@@ -42,6 +42,11 @@
  *   addr (n-1)*2 + 0   level_x10   uint16, level_mm * 10  (0 .. 6553.5 mm)
  *   addr (n-1)*2 + 1   temp_x100   int16,  temp_c  * 100  (-327.68 .. 327.67 C)
  * n = tank_number 1..6 -> addr 0..11
+ * -- volume 6 tangki, 1 register per tangki, blok terpisah setelah addr 11
+ *    (supaya addr level/temp yang sudah ada tidak berubah -- breaking change
+ *    untuk master yang sudah polling):
+ *   addr 12 + (n-1)   volume_l   uint16, volume liter bulat (0 .. 65535 L)
+ * n = tank_number 1..6 -> addr 12..17
  *
  * ponytail: level di atg_data satuannya bisa mm (jalur glt500/atg_height)
  * atau persen (jalur atg_mqtt_sub, lihat komentar di file itu) tergantung
@@ -50,6 +55,10 @@
  * presisi desimal lebih (mis. 2 angka di belakang koma persis), pindah ke
  * IEEE754 float 2-register/nilai -- perlu register map baru, jangan diam-
  * diam ubah skala di addr yang sama (breaking change untuk master).
+ *
+ * volume tidak di-scale (liter sudah bulat di kolom `volume`) dan cukup di
+ * uint16 (0..65535 L) untuk tangki BBM biasa; kalau ada tangki >65535 L
+ * pindah ke 2 register (uint32) -- jangan diam-diam ubah addr yang sudah ada.
  */
 
 #define _DEFAULT_SOURCE
@@ -72,7 +81,8 @@
 #define DEFAULT_DEVICE  "/dev/ttyUSB0" //ubah ini dengan alamt USB by path
 #define NUM_SENSORS     6
 #define NUM_HOLDING_REGS 4
-#define NUM_INPUT_REGS  (NUM_SENSORS * 2)
+#define NUM_INPUT_REGS  (NUM_SENSORS * 3)
+#define VOL_REG_BASE    (NUM_SENSORS * 2)
 
 #define REG_SLAVE_ID    0
 #define REG_BAUD_CODE   1
@@ -187,7 +197,7 @@ static void save_slave_config(sqlite3 *db, const SlaveConfig *cfg)
 static void refresh_sensor_registers(sqlite3 *db, modbus_mapping_t *mb)
 {
     sqlite3_stmt *stmt;
-    const char *sql = "SELECT tank_number, level, temp FROM atg_data "
+    const char *sql = "SELECT tank_number, level, temp, volume FROM atg_data "
                        "WHERE tank_number BETWEEN 1 AND ?";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return;
@@ -195,8 +205,9 @@ static void refresh_sensor_registers(sqlite3 *db, modbus_mapping_t *mb)
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int tank = sqlite3_column_int(stmt, 0);
-        double level = sqlite3_column_double(stmt, 1);
-        double temp  = sqlite3_column_double(stmt, 2);
+        double level  = sqlite3_column_double(stmt, 1);
+        double temp   = sqlite3_column_double(stmt, 2);
+        double volume = sqlite3_column_double(stmt, 3);
         int idx = (tank - 1) * 2;
 
         double level_scaled = level * LEVEL_SCALE;
@@ -207,8 +218,12 @@ static void refresh_sensor_registers(sqlite3 *db, modbus_mapping_t *mb)
         if (temp_scaled < -32768.0) temp_scaled = -32768.0;
         if (temp_scaled > 32767.0) temp_scaled = 32767.0;
 
+        if (volume < 0) volume = 0;
+        if (volume > 65535.0) volume = 65535.0;
+
         mb->tab_input_registers[idx]     = (uint16_t)level_scaled;
         mb->tab_input_registers[idx + 1] = (uint16_t)(int16_t)temp_scaled;
+        mb->tab_input_registers[VOL_REG_BASE + (tank - 1)] = (uint16_t)volume;
     }
     sqlite3_finalize(stmt);
 }
@@ -445,8 +460,8 @@ int main(void)
         "CREATE TABLE atg_data (tank_number INTEGER, datetime TEXT, slocn TEXT, "
         "level DOUBLE, temp DOUBLE, volume DOUBLE, capacity_tank INTEGER)",
         NULL, NULL, NULL);
-    sqlite3_exec(db, "INSERT INTO atg_data VALUES (1,'x','FS-01',323.9,22.5,0,40000)", NULL, NULL, NULL);
-    sqlite3_exec(db, "INSERT INTO atg_data VALUES (2,'x','FS-02',9999.0,-10.0,0,40000)", NULL, NULL, NULL);
+    sqlite3_exec(db, "INSERT INTO atg_data VALUES (1,'x','FS-01',323.9,22.5,29862,40000)", NULL, NULL, NULL);
+    sqlite3_exec(db, "INSERT INTO atg_data VALUES (2,'x','FS-02',9999.0,-10.0,70000,40000)", NULL, NULL, NULL);
     /* tank 3 sengaja tidak ada baris -> register harus tetap nilai lama (999), bukan 0 */
     mb->tab_input_registers[4] = 999;
 
@@ -456,7 +471,9 @@ int main(void)
     assert(mb->tab_input_registers[2] == (uint16_t)(9999.0 * 10));  /* tank2 level, masih muat di uint16 */
     assert((int16_t)mb->tab_input_registers[3] == (int16_t)(-10.0 * 100)); /* tank2 temp negatif */
     assert(mb->tab_input_registers[4] == 999);  /* tank3 kosong -> tak disentuh */
-    printf("test5 ok: refresh_sensor_registers skala & tangki kosong dibiarkan\n");
+    assert(mb->tab_input_registers[VOL_REG_BASE + 0] == 29862);     /* tank1 volume liter */
+    assert(mb->tab_input_registers[VOL_REG_BASE + 1] == 65535);     /* tank2 volume clamp (70000 > 65535) */
+    printf("test5 ok: refresh_sensor_registers skala, volume, & tangki kosong dibiarkan\n");
 
     modbus_mapping_free(mb);
     sqlite3_close(db);
