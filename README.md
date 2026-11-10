@@ -149,16 +149,18 @@ make             # build binary: ./atg_modbus_slave
 ## Test manual (sebelum jadi service)
 
 ```bash
-sudo ./atg_modbus_slave -c /dev/ttyUSB0 --debug
+sudo ./atg_modbus_slave -c /dev/serial/by-path/platform-47401c00.usb-usb-0:1:1.0-port0 --debug
 ```
 
-`-c <device>` menentukan port serial (default `/dev/ttyUSB0` kalau tidak
-diisi). `--debug` menampilkan log ke terminal (tanpa flag ini, stdout
-dibuang ke `/dev/null` — pola yang sama dengan service lain di project ini).
+`-c <device>` menentukan port serial (default by-path di atas kalau tidak
+diisi — supaya tetap stabil meski kernel assign `ttyUSB0`/`ttyUSB1` bergantian).
+`--debug` menampilkan log ke terminal (tanpa flag ini, stdout dibuang ke
+`/dev/null` — pola yang sama dengan service lain di project ini).
 
 Cek device serial-nya terdeteksi dulu:
 
 ```bash
+ls -l /dev/serial/by-path/
 ls /dev/ttyUSB*
 dmesg | grep -i usb | tail -20
 ```
@@ -191,11 +193,10 @@ Target `install` di Makefile otomatis:
 3. `systemctl daemon-reload`
 4. `systemctl enable --now atg_modbus_slave`
 
-> Sebelum install, cek dulu `atg_modbus_slave.service` — `ExecStart` di
-> situ hardcode `-c /dev/ttyUSB0`. Kalau device serial di unit Anda beda
-> (atau lebih baik pakai path stabil `/dev/serial/by-id/...` supaya tidak
-> berubah kalau ada USB lain dicolok), edit file service-nya **sebelum**
-> `sudo make install`.
+> Sebelum install, cek dulu `atg_modbus_slave.service` — `ExecStart` memakai
+> `/dev/serial/by-path/...` (stabil terhadap nomor ttyUSB). Kalau port USB
+> fisik di unit Anda beda, sesuaikan path-nya **sebelum** `sudo make install`
+> (`ls -l /dev/serial/by-path/`).
 
 Cek status setelah jalan:
 

@@ -75,7 +75,8 @@
 #include <modbus.h>
 
 #define DB_PATH         "/home/user/Apps/master_data.db"
-#define DEFAULT_DEVICE  "/dev/ttyUSB0" //ubah ini dengan alamt USB by path
+/* Stable symlink: ttyUSB0/1 boleh loncat, path fisik USB tetap sama */
+#define DEFAULT_DEVICE  "/dev/serial/by-path/platform-47401c00.usb-usb-0:1:1.0-port0"
 #define NUM_SENSORS     6
 #define NUM_HOLDING_REGS 4
 #define NUM_INPUT_REGS  (NUM_SENSORS * 3)
