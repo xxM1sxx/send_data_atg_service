@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/local/bin/atg_modbus_slave -c /dev/serial/by-path/platform-47401c00.usb-usb-0:1:1.0-port0
+ExecStart=/usr/local/bin/atg_modbus_slave -c /dev/serial/by-path/platform-musb-hdrc.1-usb-0:1:1.0-port0
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
