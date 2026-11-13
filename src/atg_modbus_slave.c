@@ -76,7 +76,7 @@
 
 #define DB_PATH         "/home/user/Apps/master_data.db"
 /* Stable symlink: ttyUSB0/1 boleh loncat, path fisik USB tetap sama */
-#define DEFAULT_DEVICE  "/dev/serial/by-path/platform-musb-hdrc.1-usb-0:1:1.0-port0"
+#define DEFAULT_DEVICE  "/dev/serial/by-path/platform-musb-hdrc.1-usb-0:1.2:1.0-port0"
 #define NUM_SENSORS     6
 #define NUM_HOLDING_REGS 4
 #define NUM_INPUT_REGS  (NUM_SENSORS * 3)

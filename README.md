@@ -149,7 +149,7 @@ make             # build binary: ./atg_modbus_slave
 ## Test manual (sebelum jadi service)
 
 ```bash
-sudo ./atg_modbus_slave -c /dev/serial/by-path/platform-musb-hdrc.1-usb-0:1:1.0-port0 --debug
+sudo ./atg_modbus_slave -c /dev/serial/by-path/platform-musb-hdrc.1-usb-0:1.2:1.0-port0 --debug
 ```
 
 `-c <device>` menentukan port serial (default by-path di atas kalau tidak
